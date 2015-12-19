@@ -12,7 +12,7 @@ import java.util.stream.IntStream;
 /**
  * Created by walker on 2015/12/14.
  */
-public class Entrance implements Runnable {
+public class Entrance {
 
     private PortInfo info;
 
@@ -40,14 +40,23 @@ public class Entrance implements Runnable {
     }
 
     public Entrance(PortInfo info, int parkingSpaceNum) {
+
         this.info = info;
+
         this.timeStamp = 0;
+
         this.ports = new ArrayList<>();
+
         this.type = PortType.ENTRANCE;
+
         this.status = PortStatus.RELEAS;
+
         this.parkingSpaceNum = parkingSpaceNum;
+
         this.occupiedNum = 0;
+
         this.enterNum = 0;
+
         this.messages = new PriorityQueue<Message>(new Comparator<Message>() {
             @Override
             public int compare(Message o1, Message o2) {
@@ -60,21 +69,23 @@ public class Entrance implements Runnable {
                 }
             }
         });
+
         try {
             this.serverSocket = new ServerSocket(info.port);
         } catch (Exception e) {
             e.printStackTrace();
         }
+
     }
 
     public void enterRequest() {
 
-        Message msg = new Message();
+        Message request = new Message();
         this.tick();
-        msg.setTimeStamp(this.timeStamp);
-        msg.setSource(this.info);
-        msg.setType(MessageType.REQUEST);
-        sendMsgToAll(msg);
+        request.setTimeStamp(this.timeStamp);
+        request.setSource(this.info);
+        request.setType(MessageType.REQUEST);
+        sendMsgToAll(request);
 
     }
 
@@ -140,98 +151,18 @@ public class Entrance implements Runnable {
         this.sendMsgToAll(informMessage);
     }
 
-    public void run() {
-
-        Socket socket = null;
-        ObjectInputStream ois = null;
-        Message message = null;
-
-        while (true) {
-            try {
-
-                System.out.print("Here is Entrance with host " + info.getIp() + " and port " + info.getPort());
-                System.out.println("there are total " + parkingSpaceNum + " positions in the parking lot, " + occupiedNum + " occupied, " + (parkingSpaceNum - occupiedNum) + " empty left.");
-                System.out.print("Is there a car?[y/n]");
-
-                Thread.sleep(1000);
-
-//                Scanner sc = new Scanner(System.in);
-//                if (sc.hasNext()) {
-//                    if (sc.next().equalsIgnoreCase("y")) {
-//                        // There is a car entering
-//                        enterRequest();
-//                    } else if (sc.next().equalsIgnoreCase("n")) {
-//                        // No car is entering
-//                        System.out.println("No car is entering! Continue...");
-//                    } else {
-//                        // Invalid input
-//                        System.out.println("Unrecognized input! Continue...");
-//                    }
-//                } else {
-//                    System.out.println("No input detected! Continue...");
-//                }
-
-                socket = serverSocket.accept();
-                ois = new ObjectInputStream(socket.getInputStream());
-                message = (Message) ois.readObject();
-                switch (message.getType()) {
-                    case REQUEST: {
-
-                    }
-                }
-
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     public static void main(String[] args) {
 
-//        int portNum = Integer.parseInt(args[0]); // 通过命令行参数获取端口号
-        int portNum = 26490;
-        PortInfo entranceInfo = new PortInfo("localhost", portNum);
+        int portNum = Integer.parseInt(args[0]);
+        PortInfo entranceInfo = new PortInfo("127.0.0.1", portNum);
 
         Entrance entrance = new Entrance(entranceInfo, Config.PARKING_SPACE_NUM);
         System.out.println(entrance.getServerSocket() == null);
-//        Thread t = new Thread(entrance, "Entrance " + portNum);
-//        t.start();
-//
-//        // 持续地获取用户输入,当收到enter请求时,给其余的进出口发送Request
-//        Scanner scanner = new Scanner(System.in);
-//        while (true) {
-//            String cmd = scanner.next();
-//            if (cmd.equalsIgnoreCase("enter")) {
-//                entrance.enterRequest();
-//            }
-//        }
 
-        ExecutorService executor = Executors.newFixedThreadPool(1);
-        executor.submit(new EntranceMessageListener(entrance));
-        executor.shutdown();
+        (new Thread(new EntranceMessageListener(entrance))).start();
+        (new Thread(new EntranceMessageHandler(entrance))).start();
+        (new Thread(new CommandLineListener(entrance))).start();
 
-    }
-
-    public void test() {
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        IntStream.range(0, 10000).forEach(i -> executor.submit(this::increment));
-        executor.shutdown();
-        System.out.print(this.occupiedNum);
-    }
-
-    public int increment() {
-//        synchronized (this) {
-        occupiedNum++;
-        return occupiedNum;
-//        }
-    }
-
-    public int decrement() {
-//        synchronized (this) {
-        occupiedNum--;
-        return occupiedNum;
-//        }
     }
 
     public ServerSocket getServerSocket() {
@@ -239,7 +170,7 @@ public class Entrance implements Runnable {
     }
 
     public synchronized void receiveMessage(Message message) {
-        this.timeStamp = Math.max(message.getTimeStamp(), this.timeStamp) + 1; // 收到消息时更新本地时钟
+        this.timeStamp = Math.max(message.getTimeStamp(), this.timeStamp); // 收到消息时更新本地时钟
         messages.add(message);
     }
 
