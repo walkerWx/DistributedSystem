@@ -9,7 +9,7 @@ public class Message {
 
     private int clock;
 
-    private int source; // source port id
+    private PortInfo source;
 
     private MessageType type;
 
@@ -21,11 +21,11 @@ public class Message {
         this.clock = clock;
     }
 
-    public int getSource() {
+    public PortInfo getSource() {
         return source;
     }
 
-    public void setSource(int source) {
+    public void setSource(PortInfo source) {
         this.source = source;
     }
 

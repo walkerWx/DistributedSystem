@@ -23,7 +23,7 @@ public class Entrance implements PortI, Runnable {
 
     private ServerSocket serverSocket;
 
-    private int totalNum;
+    private int parkingSpaceNum;
 
     private int occupiedNum;
 
@@ -31,13 +31,13 @@ public class Entrance implements PortI, Runnable {
 
     private PriorityQueue<Message> requests;
 
-    public Entrance(PortInfo info, int totalNum) {
+    public Entrance(PortInfo info, int parkingSpaceNum) {
         this.info = info;
         this.clock = 0;
         this.ports = new ArrayList<>();
         this.type = PortType.ENTRANCE;
         this.status = PortStatus.RELEAS;
-        this.totalNum = totalNum;
+        this.parkingSpaceNum = parkingSpaceNum;
         this.occupiedNum = 0;
         this.enterNum = 0;
         this.requests = new PriorityQueue<Message>(new Comparator<Message>() {
@@ -63,7 +63,7 @@ public class Entrance implements PortI, Runnable {
 
         Message msg = new Message();
         msg.setClock(this.clock);
-        msg.setSource(this.info.id);
+        msg.setSource(this.info);
         msg.setType(MessageType.REQUEST);
         sendMsg(msg);
 
@@ -71,11 +71,11 @@ public class Entrance implements PortI, Runnable {
 
     public void sendMsg(Message msg) {
         for (PortInfo port : ports) {
-            if (port.id == this.info.id) {
+            if (port == this.info) {
                 requests.add(msg);
             }
             try {
-                Socket socket = new Socket(port.host, port.id);
+                Socket socket = new Socket(port.host, port.port);
                 ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
                 oos.close();
                 socket.close();
@@ -86,37 +86,41 @@ public class Entrance implements PortI, Runnable {
     }
 
     public void run() {
+
+        Socket socket = null;
+        ObjectInputStream ois = null;
+        Message message = null;
+
         while (true) {
             try {
 
-                System.out.print("Here is Entrance " + info.id + ": ");
-                System.out.println("there are total " + totalNum + " positions in the parking lot, " + occupiedNum + " occupied, " + (totalNum - occupiedNum) + " empty left.");
+                System.out.print("Here is Entrance with host " + info.host + " and port " + info.port);
+                System.out.println("there are total " + parkingSpaceNum + " positions in the parking lot, " + occupiedNum + " occupied, " + (parkingSpaceNum - occupiedNum) + " empty left.");
                 System.out.print("Is there a car?[y/n]");
 
                 Thread.sleep(1000);
 
-                Scanner sc = new Scanner(System.in);
-                if (sc.hasNext()) {
-                    if (sc.next().equalsIgnoreCase("y")) {
-                        // There is a car entering
-                        enterRequest();
-                    } else if (sc.next().equalsIgnoreCase("n")) {
-                        // No car is entering
-                        System.out.println("No car is entering! Continue...");
-                    } else {
-                        // Invalid input
-                        System.out.println("Unrecognized input! Continue...");
-                    }
-                } else {
-                    System.out.println("No input detected! Continue...");
-                }
+//                Scanner sc = new Scanner(System.in);
+//                if (sc.hasNext()) {
+//                    if (sc.next().equalsIgnoreCase("y")) {
+//                        // There is a car entering
+//                        enterRequest();
+//                    } else if (sc.next().equalsIgnoreCase("n")) {
+//                        // No car is entering
+//                        System.out.println("No car is entering! Continue...");
+//                    } else {
+//                        // Invalid input
+//                        System.out.println("Unrecognized input! Continue...");
+//                    }
+//                } else {
+//                    System.out.println("No input detected! Continue...");
+//                }
 
-                Socket socket = serverSocket.accept();
-                ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-                Message msg = (Message) ois.readObject();
-
-                switch (msg.getType()) {
-                    case REPLY: {
+                socket = serverSocket.accept();
+                ois = new ObjectInputStream(socket.getInputStream());
+                message = (Message) ois.readObject();
+                switch (message.getType()) {
+                    case REQUEST:{
 
                     }
                 }
@@ -126,6 +130,26 @@ public class Entrance implements PortI, Runnable {
                 e.printStackTrace();
             }
         }
+    }
+
+    public static void main(String[] args) {
+
+        int portNum = Integer.parseInt(args[0]); // 通过命令行参数获取端口号
+        PortInfo entranceInfo = new PortInfo("localhost", portNum);
+
+        Entrance entrance = new Entrance(entranceInfo, Config.PARKING_SPACE_NUM);
+        Thread t = new Thread(entrance, "Entrance " + portNum);
+        t.start();
+
+        // 持续地获取用户输入,当收到enter请求时,给其余的进出口发送Request
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            String cmd = scanner.next();
+            if (cmd.equalsIgnoreCase("enter")) {
+                entrance.enterRequest();
+            }
+        }
+
     }
 
 }

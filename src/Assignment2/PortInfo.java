@@ -5,12 +5,10 @@ package Assignment2;
  */
 public class PortInfo {
 
-    int id;
     String host;
     int port;
 
-    public PortInfo(int id, String host, int port) {
-        this.id = id;
+    public PortInfo(String host, int port) {
         this.host = host;
         this.port = port;
     }
