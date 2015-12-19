@@ -17,35 +17,26 @@ public class EntranceMessageHandler implements Runnable {
     public void run() {
         while (true) {
             if (entrance.hasMessage()) {
+                entrance.tick();
                 Message message = entrance.getAndRemoveEarliestMessage();
                 switch (message.getType()) {
 
                     case REQUEST: {
-                        Message reply = new Message();
-                        reply.setTimeStamp(entrance.getTimeStamp());
-                        reply.setSource(entrance.getInfo());
-                        reply.setType(MessageType.REPLY);
-                        try {
-
-                            Socket socket = new Socket(entrance.getInfo().getIp(), entrance.getInfo().getPort());
-                            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-                            oos.writeObject(reply);
-                            oos.close();
-                            socket.close();
-
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-
-                        entrance.tick(); // 发送消息成功后更新本地时钟
-                        break;
+                        entrance.receiveRequestFrom(message.getSource());
                     }
+                    break;
 
                     case REPLY: {
-
+                        entrance.receiveReplyFrom(message.getSource());
                     }
+                    break;
 
+                    case INFORM_ENTER:{
+                        entrance.receiveInformEnterFrom(message.getSource());
+                    }
                 }
+
+
             }
         }
     }

@@ -12,7 +12,7 @@ import java.util.stream.IntStream;
 /**
  * Created by walker on 2015/12/14.
  */
-public class Entrance implements PortI, Runnable {
+public class Entrance implements Runnable {
 
     private PortInfo info;
 
@@ -31,6 +31,8 @@ public class Entrance implements PortI, Runnable {
     private int occupiedNum;
 
     private int enterNum;
+
+    private Set<PortInfo> repliedPorts;
 
     public PriorityQueue<Message> messages;
 
@@ -68,27 +70,74 @@ public class Entrance implements PortI, Runnable {
     public void enterRequest() {
 
         Message msg = new Message();
+        this.tick();
         msg.setTimeStamp(this.timeStamp);
         msg.setSource(this.info);
         msg.setType(MessageType.REQUEST);
-        sendMsg(msg);
+        sendMsgToAll(msg);
 
     }
 
-    public void sendMsg(Message msg) {
+    public void sendMsgToAll(Message msg) {
         for (PortInfo port : ports) {
             if (port == this.info) {
                 messages.add(msg);
-            }
-            try {
-                Socket socket = new Socket(port.getIp(), port.getPort());
-                ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-                oos.close();
-                socket.close();
-            } catch (Exception e) {
-                e.printStackTrace();
+            } else {
+                try {
+                    Socket socket = new Socket(port.getIp(), port.getPort());
+                    ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+                    oos.close();
+                    socket.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
+    }
+
+    public void receiveRequestFrom(PortInfo port) {
+
+        Message reply = new Message();
+        reply.setTimeStamp(this.getTimeStamp());
+        reply.setSource(this.getInfo());
+        reply.setType(MessageType.REPLY);
+        try {
+
+            Socket socket = new Socket(this.getInfo().getIp(), this.getInfo().getPort());
+            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+            oos.writeObject(reply);
+            oos.close();
+            socket.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public void receiveReplyFrom(PortInfo port) {
+        this.repliedPorts.add(port);
+        if (this.repliedPorts.containsAll(ports)) {
+            // 收到所有出入口的回复，允许车辆进入
+            System.out.print("车辆进入停车场入口" + this.info.getPort());
+            this.enterNum++;
+            this.informEnterEvent();
+            this.repliedPorts.clear();
+        }
+    }
+
+    public void receiveInformEnterFrom(PortInfo port) {
+        this.occupiedNum++;
+    }
+
+    // 通知其他所有出入口车辆进入的信息
+    public void informEnterEvent() {
+        Message informMessage = new Message();
+        informMessage.setSource(this.info);
+        this.tick();
+        informMessage.setTimeStamp(this.timeStamp);
+        informMessage.setType(MessageType.INFORM_ENTER);
+        this.sendMsgToAll(informMessage);
     }
 
     public void run() {
@@ -100,7 +149,7 @@ public class Entrance implements PortI, Runnable {
         while (true) {
             try {
 
-                System.out.print("Here is Entrance with host " + info.getIp()+ " and port " + info.getPort());
+                System.out.print("Here is Entrance with host " + info.getIp() + " and port " + info.getPort());
                 System.out.println("there are total " + parkingSpaceNum + " positions in the parking lot, " + occupiedNum + " occupied, " + (parkingSpaceNum - occupiedNum) + " empty left.");
                 System.out.print("Is there a car?[y/n]");
 
@@ -189,11 +238,9 @@ public class Entrance implements PortI, Runnable {
         return this.serverSocket;
     }
 
-    public void addMessage(Message message) {
-        synchronized (this) {
-            this.timeStamp = Math.max(message.getTimeStamp(), this.timeStamp) + 1; // 收到消息时更新本地时钟
-            messages.add(message);
-        }
+    public synchronized void receiveMessage(Message message) {
+        this.timeStamp = Math.max(message.getTimeStamp(), this.timeStamp) + 1; // 收到消息时更新本地时钟
+        messages.add(message);
     }
 
     public boolean hasMessage() {

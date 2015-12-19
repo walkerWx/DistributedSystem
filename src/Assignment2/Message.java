@@ -40,5 +40,5 @@ public class Message implements Serializable{
 }
 
 enum MessageType {
-    REQUEST, REPLY
+    REQUEST, REPLY, INFORM_ENTER
 }

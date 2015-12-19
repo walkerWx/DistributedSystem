@@ -29,7 +29,7 @@ public class EntranceMessageListener implements Runnable {
                 socket = this.entrance.getServerSocket().accept();
                 ois = new ObjectInputStream(socket.getInputStream());
                 message = (Message) ois.readObject();
-                entrance.addMessage(message);
+                entrance.receiveMessage(message);
                 System.out.println("Get message " + entrance.messages.size());
 
             } catch (Exception e) {
