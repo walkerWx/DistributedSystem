@@ -5,6 +5,9 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 
 /**
  * Created by walker on 2015/12/14.
@@ -13,7 +16,7 @@ public class Entrance implements PortI, Runnable {
 
     private PortInfo info;
 
-    private int clock;
+    private int timeStamp;
 
     private List<PortInfo> ports;
 
@@ -29,23 +32,26 @@ public class Entrance implements PortI, Runnable {
 
     private int enterNum;
 
-    private PriorityQueue<Message> requests;
+    public PriorityQueue<Message> messages;
+
+    public Entrance() {
+    }
 
     public Entrance(PortInfo info, int parkingSpaceNum) {
         this.info = info;
-        this.clock = 0;
+        this.timeStamp = 0;
         this.ports = new ArrayList<>();
         this.type = PortType.ENTRANCE;
         this.status = PortStatus.RELEAS;
         this.parkingSpaceNum = parkingSpaceNum;
         this.occupiedNum = 0;
         this.enterNum = 0;
-        this.requests = new PriorityQueue<Message>(new Comparator<Message>() {
+        this.messages = new PriorityQueue<Message>(new Comparator<Message>() {
             @Override
             public int compare(Message o1, Message o2) {
-                if (o1.getClock() < o2.getClock()) {
+                if (o1.getTimeStamp() < o2.getTimeStamp()) {
                     return -1;
-                } else if (o1.getClock() > o2.getClock()) {
+                } else if (o1.getTimeStamp() > o2.getTimeStamp()) {
                     return 1;
                 } else {
                     return 0;
@@ -53,7 +59,7 @@ public class Entrance implements PortI, Runnable {
             }
         });
         try {
-            serverSocket = new ServerSocket(info.port);
+            this.serverSocket = new ServerSocket(info.port);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -62,7 +68,7 @@ public class Entrance implements PortI, Runnable {
     public void enterRequest() {
 
         Message msg = new Message();
-        msg.setClock(this.clock);
+        msg.setTimeStamp(this.timeStamp);
         msg.setSource(this.info);
         msg.setType(MessageType.REQUEST);
         sendMsg(msg);
@@ -72,10 +78,10 @@ public class Entrance implements PortI, Runnable {
     public void sendMsg(Message msg) {
         for (PortInfo port : ports) {
             if (port == this.info) {
-                requests.add(msg);
+                messages.add(msg);
             }
             try {
-                Socket socket = new Socket(port.host, port.port);
+                Socket socket = new Socket(port.getIp(), port.getPort());
                 ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
                 oos.close();
                 socket.close();
@@ -94,7 +100,7 @@ public class Entrance implements PortI, Runnable {
         while (true) {
             try {
 
-                System.out.print("Here is Entrance with host " + info.host + " and port " + info.port);
+                System.out.print("Here is Entrance with host " + info.getIp()+ " and port " + info.getPort());
                 System.out.println("there are total " + parkingSpaceNum + " positions in the parking lot, " + occupiedNum + " occupied, " + (parkingSpaceNum - occupiedNum) + " empty left.");
                 System.out.print("Is there a car?[y/n]");
 
@@ -120,7 +126,7 @@ public class Entrance implements PortI, Runnable {
                 ois = new ObjectInputStream(socket.getInputStream());
                 message = (Message) ois.readObject();
                 switch (message.getType()) {
-                    case REQUEST:{
+                    case REQUEST: {
 
                     }
                 }
@@ -134,22 +140,81 @@ public class Entrance implements PortI, Runnable {
 
     public static void main(String[] args) {
 
-        int portNum = Integer.parseInt(args[0]); // 通过命令行参数获取端口号
+//        int portNum = Integer.parseInt(args[0]); // 通过命令行参数获取端口号
+        int portNum = 26490;
         PortInfo entranceInfo = new PortInfo("localhost", portNum);
 
         Entrance entrance = new Entrance(entranceInfo, Config.PARKING_SPACE_NUM);
-        Thread t = new Thread(entrance, "Entrance " + portNum);
-        t.start();
+        System.out.println(entrance.getServerSocket() == null);
+//        Thread t = new Thread(entrance, "Entrance " + portNum);
+//        t.start();
+//
+//        // 持续地获取用户输入,当收到enter请求时,给其余的进出口发送Request
+//        Scanner scanner = new Scanner(System.in);
+//        while (true) {
+//            String cmd = scanner.next();
+//            if (cmd.equalsIgnoreCase("enter")) {
+//                entrance.enterRequest();
+//            }
+//        }
 
-        // 持续地获取用户输入,当收到enter请求时,给其余的进出口发送Request
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            String cmd = scanner.next();
-            if (cmd.equalsIgnoreCase("enter")) {
-                entrance.enterRequest();
-            }
-        }
+        ExecutorService executor = Executors.newFixedThreadPool(1);
+        executor.submit(new EntranceMessageListener(entrance));
+        executor.shutdown();
 
     }
 
+    public void test() {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        IntStream.range(0, 10000).forEach(i -> executor.submit(this::increment));
+        executor.shutdown();
+        System.out.print(this.occupiedNum);
+    }
+
+    public int increment() {
+//        synchronized (this) {
+        occupiedNum++;
+        return occupiedNum;
+//        }
+    }
+
+    public int decrement() {
+//        synchronized (this) {
+        occupiedNum--;
+        return occupiedNum;
+//        }
+    }
+
+    public ServerSocket getServerSocket() {
+        return this.serverSocket;
+    }
+
+    public void addMessage(Message message) {
+        synchronized (this) {
+            this.timeStamp = Math.max(message.getTimeStamp(), this.timeStamp) + 1; // 收到消息时更新本地时钟
+            messages.add(message);
+        }
+    }
+
+    public boolean hasMessage() {
+        return messages.size() != 0;
+    }
+
+    public Message getAndRemoveEarliestMessage() {
+        synchronized (this) {
+            return messages.poll();
+        }
+    }
+
+    public int getTimeStamp() {
+        return timeStamp;
+    }
+
+    public synchronized void tick() {
+        this.timeStamp++;
+    }
+
+    public PortInfo getInfo() {
+        return this.info;
+    }
 }

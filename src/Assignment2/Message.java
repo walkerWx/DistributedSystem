@@ -1,24 +1,25 @@
 package Assignment2;
 
+import java.io.Serializable;
 import java.security.Timestamp;
 
 /**
  * Created by walker on 2015/12/14.
  */
-public class Message {
+public class Message implements Serializable{
 
-    private int clock;
+    private int timeStamp;
 
     private PortInfo source;
 
     private MessageType type;
 
-    public int getClock() {
-        return clock;
+    public int getTimeStamp() {
+        return timeStamp;
     }
 
-    public void setClock(int clock) {
-        this.clock = clock;
+    public void setTimeStamp(int timeStamp) {
+        this.timeStamp = timeStamp;
     }
 
     public PortInfo getSource() {
