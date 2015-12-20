@@ -1,9 +1,11 @@
 package Assignment2;
 
+import java.io.Serializable;
+
 /**
  * Created by walker on 2015/12/14.
  */
-public class PortInfo {
+public class PortInfo implements Serializable {
 
     String ip;
     int port;
@@ -30,7 +32,17 @@ public class PortInfo {
     }
 
     @Override
-    public String toString(){
+    public String toString() {
         return ip + ":" + port;
+    }
+
+    @Override
+    public boolean equals(Object that) {
+        if (!(that instanceof PortInfo)) {
+            return false;
+        }
+
+        return (this.ip == (((PortInfo) that).ip)) && (this.ip == (((PortInfo) that).ip));
+
     }
 }

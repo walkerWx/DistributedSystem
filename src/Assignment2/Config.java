@@ -14,13 +14,13 @@ import java.util.Scanner;
  */
 public class Config {
 
-    private static int PARKING_SPACE_NUM;
+    private static int PARKING_SPACE_NUM = 10;
     private static int ENTRANCE_NUM;
     private static int EXIT_NUM;
 
     private static List<PortInfo> entrances;
     private static List<PortInfo> exits;
-    private static String path = "./src/Configuration.txt";
+    private static String path = "E:\\Projects\\DistributedSystem\\src\\Configuration.txt";
 
 
     static {
@@ -35,7 +35,7 @@ public class Config {
             if (!configFile.exists()) {
 
                 // 若配置文件不存在，则通过控制台输入配置，并将其写入到配置文件中
-                System.out.println("Can not find configuration file in current directory : " + configFile.getCanonicalPath());
+                System.out.println("Can not find configuration file in directory : " + configFile.getCanonicalPath());
                 System.out.println("Creating...");
                 configFile.createNewFile();
                 Scanner scanner = new Scanner(System.in);
@@ -73,6 +73,7 @@ public class Config {
                 }
             }
 
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -83,10 +84,12 @@ public class Config {
     }
 
     public static List<PortInfo> getEntranceList() {
+        readFromFile();
         return entrances;
     }
 
     public static List<PortInfo> getExitList() {
+        readFromFile();
         return exits;
     }
 
@@ -95,13 +98,13 @@ public class Config {
 
             case ENTRANCE: {
                 entrances.add(info);
-                update();
+                writeToFile();
             }
             break;
 
             case EXIT: {
                 exits.add(info);
-                update();
+                writeToFile();
             }
             break;
 
@@ -118,7 +121,7 @@ public class Config {
         addPort(info, PortType.ENTRANCE);
     }
 
-    private static void update() {
+    private static void writeToFile() {
         try {
             PrintWriter writer = new PrintWriter(new File(path), "UTF-8");
             writer.println(PARKING_SPACE_NUM);
@@ -135,4 +138,32 @@ public class Config {
             e.printStackTrace();
         }
     }
+
+    private static void readFromFile() {
+        try {
+            entrances.clear();
+            exits.clear();
+            File configFile = new File(path);
+            BufferedReader br = new BufferedReader(new FileReader(configFile));
+            PARKING_SPACE_NUM = Integer.parseInt(br.readLine());
+            ENTRANCE_NUM = Integer.parseInt(br.readLine());
+            for (int i = 0; i < ENTRANCE_NUM; ++i) {
+                String info = br.readLine();
+                String ip = info.split(":")[0];
+                int port = Integer.parseInt(info.split(":")[1]);
+                entrances.add(new PortInfo(ip, port));
+            }
+            EXIT_NUM = Integer.parseInt(br.readLine());
+            for (int i = 0; i < EXIT_NUM; ++i) {
+                String info = br.readLine();
+                String ip = info.split(":")[0];
+                int port = Integer.parseInt(info.split(":")[1]);
+                exits.add(new PortInfo(ip, port));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 }

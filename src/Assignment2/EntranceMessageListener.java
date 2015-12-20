@@ -30,7 +30,22 @@ public class EntranceMessageListener implements Runnable {
                 ois = new ObjectInputStream(socket.getInputStream());
                 message = (Message) ois.readObject();
                 entrance.receiveMessage(message);
-                System.out.println("Get message " + entrance.messages.size());
+                System.out.println("Get message from " + message.getSource());
+                switch (message.getType()) {
+                    case REPLY:
+                        System.out.println(". Message type is reply");
+                        break;
+                    case REQUEST:
+                        System.out.println(". Message type is request");
+                        break;
+                    case INFORM_ENTER:
+                        System.out.println(". Message type is inform enter");
+                        break;
+                    case UPDATE:
+                        System.out.println(". Message type is update");
+                        break;
+                }
+                ois.close();
 
             } catch (Exception e) {
                 e.printStackTrace();

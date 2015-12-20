@@ -7,6 +7,7 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collector;
 import java.util.stream.IntStream;
 
 /**
@@ -34,29 +35,31 @@ public class Entrance {
 
     private int enterNum;
 
-    private Set<PortInfo> repliedPorts;
+    private int repliedPortNum;
 
     public PriorityQueue<Message> messages;
 
-    public Entrance(PortInfo info, int parkingSpaceNum) {
+    public Entrance(PortInfo info) {
 
         this.info = info;
 
         this.timeStamp = 0;
 
-        this.entrances = new ArrayList<>();
+        this.entrances = Config.getEntranceList();
 
-        this.exits = new ArrayList<>();
+        this.exits = Config.getExitList();
 
         this.type = PortType.ENTRANCE;
 
         this.status = PortStatus.RELEAS;
 
-        this.parkingSpaceNum = parkingSpaceNum;
+        this.parkingSpaceNum = Config.getParkingSpaceNum();
 
         this.occupiedNum = 0;
 
         this.enterNum = 0;
+
+        this.repliedPortNum = 0;
 
         this.messages = new PriorityQueue<Message>(new Comparator<Message>() {
             @Override
@@ -77,6 +80,12 @@ public class Entrance {
             e.printStackTrace();
         }
 
+        // 通知所有的出入口增加了新的入口
+        Message update = new Message();
+        update.setSource(this.info);
+        update.setTimeStamp(this.timeStamp);
+        update.setType(MessageType.UPDATE);
+        sendMsgToAll(update);
     }
 
     public void enterRequest() {
@@ -90,14 +99,15 @@ public class Entrance {
 
     }
 
-    public void sendMsgToAll(Message msg) {
-        for (PortInfo port : entrances) {
-            if (port == this.info) {
+    public void sendMsgToEntrances(Message msg) {
+        for (PortInfo entrance : entrances) {
+            if (entrance == this.info) {
                 messages.add(msg);
             } else {
                 try {
-                    Socket socket = new Socket(port.getIp(), port.getPort());
+                    Socket socket = new Socket(entrance.getIp(), entrance.getPort());
                     ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+                    oos.writeObject(msg);
                     oos.close();
                     socket.close();
                 } catch (Exception e) {
@@ -105,17 +115,38 @@ public class Entrance {
                 }
             }
         }
+
     }
 
-    public void receiveRequestFrom(PortInfo port) {
+    public void sendMsgToExits(Message msg) {
+        for (PortInfo exit : exits) {
+            try {
+                Socket socket = new Socket(exit.getIp(), exit.getPort());
+                ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+                oos.writeObject(msg);
+                oos.close();
+                socket.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
+    public void sendMsgToAll(Message msg) {
+        sendMsgToEntrances(msg);
+        sendMsgToExits(msg);
+    }
+
+    public void handleRequestFrom(PortInfo port) {
+
+        System.out.println("Handle Request from " + port);
         Message reply = new Message();
         reply.setTimeStamp(this.getTimeStamp());
         reply.setSource(this.getInfo());
         reply.setType(MessageType.REPLY);
         try {
 
-            Socket socket = new Socket(this.getInfo().getIp(), this.getInfo().getPort());
+            Socket socket = new Socket(port.getIp(), port.getPort());
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
             oos.writeObject(reply);
             oos.close();
@@ -127,23 +158,34 @@ public class Entrance {
 
     }
 
-    public void receiveReplyFrom(PortInfo port) {
-        this.repliedPorts.add(port);
-        if (this.repliedPorts.containsAll(entrances)) {
+    public void handleReplyFrom(PortInfo port) {
+        System.out.println("Handle reply from " + port);
+        this.repliedPortNum++;
+        if (this.repliedPortNum == entrances.size()) {
             // 收到所有出入口的回复，允许车辆进入
             System.out.print("车辆进入停车场入口" + this.info.getPort());
             this.enterNum++;
             this.informEnterEvent();
-            this.repliedPorts.clear();
+            this.repliedPortNum = 0;
         }
     }
 
-    public void receiveInformEnterFrom(PortInfo port) {
+    public synchronized void handleInformEnterFrom(PortInfo port) {
+        System.out.println("Handle inform enter from " + port);
         this.occupiedNum++;
+    }
+
+    public synchronized void updatePorts() {
+        System.out.println("Update ports");
+        this.entrances = Config.getEntranceList();
+        this.exits = Config.getExitList();
+        show(entrances);
     }
 
     // 通知其他所有出入口车辆进入的信息
     public void informEnterEvent() {
+        System.out.print("Now informing other ports entering a car");
+        show(entrances);
         Message informMessage = new Message();
         informMessage.setSource(this.info);
         this.tick();
@@ -157,8 +199,9 @@ public class Entrance {
         int portNum = Integer.parseInt(args[0]);
         PortInfo entranceInfo = new PortInfo("127.0.0.1", portNum);
 
-        Entrance entrance = new Entrance(entranceInfo, Config.getParkingSpaceNum());
-        System.out.println(entrance.getServerSocket() == null);
+        // 通过全局的配置文件添加一个入口
+        Config.addPort(entranceInfo, PortType.ENTRANCE);
+        Entrance entrance = new Entrance(entranceInfo);
 
         (new Thread(new EntranceMessageListener(entrance))).start();
         (new Thread(new EntranceMessageHandler(entrance))).start();
@@ -195,5 +238,17 @@ public class Entrance {
 
     public PortInfo getInfo() {
         return this.info;
+    }
+
+    public int getOccupiedNum() {
+        return this.occupiedNum;
+    }
+
+    public int getEnterNum() {
+        return this.enterNum;
+    }
+
+    public void show(Collection list) {
+        list.forEach(e -> System.out.println(e));
     }
 }
