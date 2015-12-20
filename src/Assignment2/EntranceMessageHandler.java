@@ -22,11 +22,10 @@ public class EntranceMessageHandler implements Runnable {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            System.out.println("Here is Entrance at " + entrance.getInfo());
-            System.out.println("Now has occupied places number : " + entrance.getOccupiedNum());
-            System.out.println("Now has enter car number : " + entrance.getEnterNum());
+//            System.out.println("Here is Entrance at " + entrance.getInfo());
+//            System.out.println("Now has occupied places number : " + entrance.getOccupiedNum());
+//            System.out.println("Now has enter car number : " + entrance.getEnterNum());
             if (entrance.hasMessage()) {
-                System.out.println("Has message!");
                 entrance.tick();
                 Message message = entrance.getAndRemoveEarliestMessage();
                 switch (message.getType()) {
@@ -44,10 +43,22 @@ public class EntranceMessageHandler implements Runnable {
                     case INFORM_ENTER: {
                         entrance.handleInformEnterFrom(message.getSource());
                     }
+                    break;
+
+                    case INFORM_EXIT:{
+                        entrance.handleInformExitFrom(message.getSource());
+                    }
+                    break;
 
                     case UPDATE: {
-                        entrance.updatePorts();
+                        entrance.handleUpdateFrom(message.getSource());
                     }
+                    break;
+
+                    case UPDATE_REPLY:{
+                        entrance.handleUpdateReply(message.getData());
+                    }
+                    break;
                 }
 
 

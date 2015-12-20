@@ -1,14 +1,9 @@
 package Assignment2;
 
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Collector;
-import java.util.stream.IntStream;
 
 /**
  * Created by walker on 2015/12/14.
@@ -24,8 +19,6 @@ public class Entrance {
     private List<PortInfo> exits;
 
     private PortType type;
-
-    private PortStatus status;
 
     private ServerSocket serverSocket;
 
@@ -50,8 +43,6 @@ public class Entrance {
         this.exits = Config.getExitList();
 
         this.type = PortType.ENTRANCE;
-
-        this.status = PortStatus.RELEAS;
 
         this.parkingSpaceNum = Config.getParkingSpaceNum();
 
@@ -90,6 +81,11 @@ public class Entrance {
 
     public void enterRequest() {
 
+        if(occupiedNum == parkingSpaceNum) {
+            System.out.println("ERROR: There is no space left for cars!");
+            return;
+        }
+
         Message request = new Message();
         this.tick();
         request.setTimeStamp(this.timeStamp);
@@ -97,6 +93,18 @@ public class Entrance {
         request.setType(MessageType.REQUEST);
         sendMsgToAll(request);
 
+    }
+
+    private void sendMsgTo(Message msg, PortInfo port) {
+        try {
+            Socket socket = new Socket(port.getIp(), port.getPort());
+            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+            oos.writeObject(msg);
+            oos.close();
+            socket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public void sendMsgToEntrances(Message msg) {
@@ -139,7 +147,7 @@ public class Entrance {
 
     public void handleRequestFrom(PortInfo port) {
 
-        System.out.println("Handle Request from " + port);
+//        System.out.println("Handle Request from " + port);
         Message reply = new Message();
         reply.setTimeStamp(this.getTimeStamp());
         reply.setSource(this.getInfo());
@@ -159,11 +167,11 @@ public class Entrance {
     }
 
     public void handleReplyFrom(PortInfo port) {
-        System.out.println("Handle reply from " + port);
+//        System.out.println("Handle reply from " + port);
         this.repliedPortNum++;
         if (this.repliedPortNum == entrances.size()) {
             // 收到所有出入口的回复，允许车辆进入
-            System.out.print("车辆进入停车场入口" + this.info.getPort());
+            System.out.println("INFO: A car is ENTERING the parking place.");
             this.enterNum++;
             this.informEnterEvent();
             this.repliedPortNum = 0;
@@ -171,21 +179,36 @@ public class Entrance {
     }
 
     public synchronized void handleInformEnterFrom(PortInfo port) {
-        System.out.println("Handle inform enter from " + port);
+//        System.out.println("Handle inform enter from " + port);
         this.occupiedNum++;
     }
 
-    public synchronized void updatePorts() {
-        System.out.println("Update ports");
+    public synchronized void handleInformExitFrom(PortInfo port) {
+//        System.out.println("Handle inform exit from " + port);
+        this.occupiedNum--;
+    }
+
+    public synchronized void handleUpdateFrom(PortInfo port) {
+//        System.out.println("Update ports");
         this.entrances = Config.getEntranceList();
         this.exits = Config.getExitList();
-        show(entrances);
+        Message reply = new Message();
+        reply.setSource(this.info);
+        tick();
+        reply.setTimeStamp(this.timeStamp);
+        reply.setType(MessageType.UPDATE_REPLY);
+        reply.setData(this.occupiedNum);
+        sendMsgTo(reply, port);
+    }
+
+    // 新增出入口时需要通过回复的方式获取当前已经被使用的停车位
+    public void handleUpdateReply(int occupiedNum) {
+        this.occupiedNum = occupiedNum;
     }
 
     // 通知其他所有出入口车辆进入的信息
     public void informEnterEvent() {
-        System.out.print("Now informing other ports entering a car");
-        show(entrances);
+//        System.out.print("Now informing other ports entering a car");
         Message informMessage = new Message();
         informMessage.setSource(this.info);
         this.tick();
@@ -205,7 +228,7 @@ public class Entrance {
 
         (new Thread(new EntranceMessageListener(entrance))).start();
         (new Thread(new EntranceMessageHandler(entrance))).start();
-        (new Thread(new CommandLineListener(entrance))).start();
+        (new Thread(new EntranceCmdListener(entrance))).start();
 
     }
 
@@ -248,7 +271,17 @@ public class Entrance {
         return this.enterNum;
     }
 
-    public void show(Collection list) {
-        list.forEach(e -> System.out.println(e));
+    public void showUsage() {
+        System.out.print("Please enter [ ENTER ] for entering a car");
+        System.out.println(" or [ SHOW ] to show the status of this port");
+    }
+
+    public void showStatus() {
+        System.out.println("This is an Entrance at " + info);
+        System.out.println("Current time is (as an integer) " + timeStamp);
+        System.out.println("There are " + messages.size() + " messages to be handled");
+        System.out.println("Total parking spaces : " + parkingSpaceNum);
+        System.out.println("Occupied parking spaces : " + occupiedNum);
+        System.out.println("Total entered cars : " + enterNum);
     }
 }

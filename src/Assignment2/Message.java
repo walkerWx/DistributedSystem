@@ -14,6 +14,8 @@ public class Message implements Serializable{
 
     private MessageType type;
 
+    private int data;
+
     public int getTimeStamp() {
         return timeStamp;
     }
@@ -37,8 +39,16 @@ public class Message implements Serializable{
     public void setType(MessageType type) {
         this.type = type;
     }
+
+    public int getData() {
+        return data;
+    }
+
+    public void setData(int data) {
+        this.data = data;
+    }
 }
 
 enum MessageType {
-    REQUEST, REPLY, INFORM_ENTER, UPDATE
+    REQUEST, REPLY, INFORM_ENTER, INFORM_EXIT, UPDATE, UPDATE_REPLY
 }
