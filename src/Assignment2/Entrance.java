@@ -18,7 +18,9 @@ public class Entrance {
 
     private int timeStamp;
 
-    private List<PortInfo> ports;
+    private List<PortInfo> entrances;
+
+    private List<PortInfo> exits;
 
     private PortType type;
 
@@ -36,16 +38,15 @@ public class Entrance {
 
     public PriorityQueue<Message> messages;
 
-    public Entrance() {
-    }
-
     public Entrance(PortInfo info, int parkingSpaceNum) {
 
         this.info = info;
 
         this.timeStamp = 0;
 
-        this.ports = new ArrayList<>();
+        this.entrances = new ArrayList<>();
+
+        this.exits = new ArrayList<>();
 
         this.type = PortType.ENTRANCE;
 
@@ -90,7 +91,7 @@ public class Entrance {
     }
 
     public void sendMsgToAll(Message msg) {
-        for (PortInfo port : ports) {
+        for (PortInfo port : entrances) {
             if (port == this.info) {
                 messages.add(msg);
             } else {
@@ -128,7 +129,7 @@ public class Entrance {
 
     public void receiveReplyFrom(PortInfo port) {
         this.repliedPorts.add(port);
-        if (this.repliedPorts.containsAll(ports)) {
+        if (this.repliedPorts.containsAll(entrances)) {
             // 收到所有出入口的回复，允许车辆进入
             System.out.print("车辆进入停车场入口" + this.info.getPort());
             this.enterNum++;
@@ -156,7 +157,7 @@ public class Entrance {
         int portNum = Integer.parseInt(args[0]);
         PortInfo entranceInfo = new PortInfo("127.0.0.1", portNum);
 
-        Entrance entrance = new Entrance(entranceInfo, Config.PARKING_SPACE_NUM);
+        Entrance entrance = new Entrance(entranceInfo, Config.getParkingSpaceNum());
         System.out.println(entrance.getServerSocket() == null);
 
         (new Thread(new EntranceMessageListener(entrance))).start();
